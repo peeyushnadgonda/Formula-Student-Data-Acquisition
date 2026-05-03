@@ -1,0 +1,496 @@
+#include <iostream>
+#include <vector>
+#include <fstream>
+#include <iomanip>
+#include <cmath>
+using namespace std;
+
+
+class Person {
+protected:
+    string name;
+    int age;
+
+public:
+    Person() {
+        name = "Unknown";
+        age = 0;
+    }
+
+    virtual void input() {
+        cout << "Enter Name: ";
+        cin >> name;
+
+        cout << "Enter Age: ";
+        cin >> age;
+    }
+
+    virtual void display() {
+        cout << "\nName: " << name;
+        cout << "\nAge: " << age << endl;
+    }
+
+    virtual double recommendedSleep() {
+        return 8.0;
+    }
+
+    virtual ~Person() {}
+};
+
+
+class LifestyleProfile : public Person {
+protected:
+    double workHours;
+    double stressLevel;
+    double screenTime;
+    double exerciseTime;
+
+public:
+    LifestyleProfile() {
+        workHours = 0;
+        stressLevel = 0;
+        screenTime = 0;
+        exerciseTime = 0;
+    }
+
+    void input() override {
+        Person::input();
+
+        cout << "Enter Work/Study Hours: ";
+        cin >> workHours;
+
+        cout << "Enter Stress Level (1-10): ";
+        cin >> stressLevel;
+
+        cout << "Enter Screen Time: ";
+        cin >> screenTime;
+
+        cout << "Enter Exercise Time: ";
+        cin >> exerciseTime;
+    }
+
+    void display() override {
+        Person::display();
+
+        cout << "Work Hours: " << workHours << endl;
+        cout << "Stress Level: " << stressLevel << endl;
+        cout << "Screen Time: " << screenTime << endl;
+        cout << "Exercise Time: " << exerciseTime << endl;
+    }
+
+    double getWork() { return workHours; }
+    double getStress() { return stressLevel; }
+    double getScreen() { return screenTime; }
+    double getExercise() { return exerciseTime; }
+};
+
+
+class StudentProfile : public LifestyleProfile {
+public:
+    double recommendedSleep() override {
+        return 7.5 + (stressLevel * 0.1);
+    }
+};
+
+
+class AthleteProfile : public LifestyleProfile {
+public:
+    double recommendedSleep() override {
+        return 8.5 + (exerciseTime * 0.2);
+    }
+};
+
+
+
+class WorkingProfile : public LifestyleProfile {
+public:
+    double recommendedSleep() override {
+        return 7 + (workHours * 0.1);
+    }
+};
+
+
+class SleepLog {
+private:
+    vector<double> sleepHours;
+
+public:
+    void addEntry(double hours) {
+        sleepHours.push_back(hours);
+    }
+
+    void displayLog() {
+        cout << "\n--- Sleep Log ---\n";
+
+        for (int i = 0; i < sleepHours.size(); i++) {
+            cout << "Day " << i + 1 << ": "
+                 << sleepHours[i] << " hrs\n";
+        }
+    }
+
+    double averageSleep() {
+        double sum = 0;
+
+        for (double h : sleepHours) {
+            sum += h;
+        }
+
+        if (sleepHours.size() == 0)
+            return 0;
+
+        return sum / sleepHours.size();
+    }
+
+    double maxSleep() {
+        double mx = 0;
+
+        for (double h : sleepHours) {
+            if (h > mx) mx = h;
+        }
+
+        return mx;
+    }
+
+    double minSleep() {
+        if (sleepHours.empty()) return 0;
+
+        double mn = sleepHours[0];
+
+        for (double h : sleepHours) {
+            if (h < mn) mn = h;
+        }
+
+        return mn;
+    }
+};
+
+
+
+class SleepCalculator {
+public:
+    static vector<double> calculate(double wake) {
+        vector<double> result;
+
+        double cycle = 1.5;
+
+        for (int i = 6; i >= 3; i--) {
+            double t = wake - (i * cycle);
+
+            if (t < 0) t += 24;
+
+            result.push_back(t);
+        }
+
+        return result;
+    }
+
+    static void display(vector<double> times) {
+        cout << "\nSuggested Sleep Times:\n";
+
+        for (double t : times) {
+            int hr = (int)t;
+            int min = (t - hr) * 60;
+
+            cout << setw(2) << setfill('0') << hr
+                 << ":" << setw(2) << min << endl;
+        }
+    }
+};
+
+
+
+class SleepDebt {
+public:
+    static double calculate(double required, double actual) {
+        return required - actual;
+    }
+};
+
+
+class HealthScore {
+public:
+    static double calculate(double sleep,
+                            double stress,
+                            double work,
+                            double screen,
+                            double exercise) {
+
+        double score = 100;
+
+        score -= stress * 3;
+        score -= work * 1.5;
+        score -= screen * 1;
+
+        score += exercise * 2;
+
+        if (sleep < 6) score -= 20;
+        if (sleep > 9) score -= 10;
+
+        if (score < 0) score = 0;
+
+        return score;
+    }
+};
+
+
+
+class StressAnalyzer {
+public:
+    static void analyze(double stress) {
+        cout << "\nStress Analysis:\n";
+
+        if (stress <= 3)
+            cout << "Low Stress 😊\n";
+        else if (stress <= 7)
+            cout << "Moderate Stress 😐\n";
+        else
+            cout << "High Stress ⚠\n";
+    }
+};
+
+
+class RecommendationEngine {
+public:
+    static void give(double sleep,
+                     double stress,
+                     double work,
+                     double screen,
+                     double exercise) {
+
+        cout << "\n--- Recommendations ---\n";
+
+        if (sleep < 6)
+            cout << "Increase sleep duration.\n";
+
+        if (stress > 7)
+            cout << "Practice meditation or relaxation.\n";
+
+        if (work > 10)
+            cout << "Reduce workload and take breaks.\n";
+
+        if (screen > 6)
+            cout << "Reduce screen exposure before bed.\n";
+
+        if (exercise < 1)
+            cout << "Try at least 30 min exercise daily.\n";
+
+        if (sleep >= 7 && stress < 5)
+            cout << "Good lifestyle balance!\n";
+    }
+};
+
+
+class FileManager {
+public:
+    static void save(double avg, double health) {
+        ofstream file("sleep_report.txt");
+
+        file << "Average Sleep: " << avg << endl;
+        file << "Health Score: " << health << endl;
+
+        file.close();
+
+        cout << "Report Saved.\n";
+    }
+
+    static void load() {
+        ifstream file("sleep_report.txt");
+        string line;
+
+        cout << "\n--- Saved Report ---\n";
+
+        while (getline(file, line)) {
+            cout << line << endl;
+        }
+
+        file.close();
+    }
+};
+
+
+class Report {
+public:
+    static void generate(double avg,
+                         double debt,
+                         double health) {
+
+        cout << "\n===== REPORT =====\n";
+
+        cout << "Average Sleep: " << avg << endl;
+        cout << "Sleep Debt: " << debt << endl;
+        cout << "Health Score: " << health << endl;
+
+        cout << "\nSleep Graph:\n";
+
+        int bars = avg * 2;
+
+        for (int i = 0; i < bars; i++)
+            cout << "*";
+
+        cout << endl;
+    }
+};
+
+class SleepSystem {
+private:
+    LifestyleProfile* user;
+    SleepLog log;
+
+public:
+    SleepSystem() {
+        user = nullptr;
+    }
+
+    void createProfile() {
+        int type;
+
+        cout << "\n1. Student\n2. Athlete\n3. Working\nChoice: ";
+        cin >> type;
+
+        if (type == 1)
+            user = new StudentProfile();
+        else if (type == 2)
+            user = new AthleteProfile();
+        else
+            user = new WorkingProfile();
+
+        user->input();
+    }
+
+    void addSleep() {
+        double h;
+        cout << "Enter sleep hours: ";
+        cin >> h;
+
+        log.addEntry(h);
+    }
+
+    void showLogs() {
+        log.displayLog();
+    }
+
+    void analyze() {
+        if (!user) {
+            cout << "Create profile first!\n";
+            return;
+        }
+
+        double avg = log.averageSleep();
+        double req = user->recommendedSleep();
+        double debt = SleepDebt::calculate(req, avg);
+
+        double health = HealthScore::calculate(
+            avg,
+            user->getStress(),
+            user->getWork(),
+            user->getScreen(),
+            user->getExercise()
+        );
+
+        cout << "\nAverage Sleep: " << avg << endl;
+        cout << "Required Sleep: " << req << endl;
+        cout << "Sleep Debt: " << debt << endl;
+        cout << "Health Score: " << health << endl;
+
+        StressAnalyzer::analyze(user->getStress());
+
+        RecommendationEngine::give(
+            avg,
+            user->getStress(),
+            user->getWork(),
+            user->getScreen(),
+            user->getExercise()
+        );
+
+        Report::generate(avg, debt, health);
+    }
+
+    void suggestTime() {
+        double wake;
+
+        cout << "Enter wake time: ";
+        cin >> wake;
+
+        vector<double> t =
+            SleepCalculator::calculate(wake);
+
+        SleepCalculator::display(t);
+    }
+
+    void menu() {
+        int ch;
+
+        do {
+            cout << "\n====== MENU ======\n";
+            cout << "1. Create Profile\n";
+            cout << "2. Add Sleep\n";
+            cout << "3. View Logs\n";
+            cout << "4. Analyze\n";
+            cout << "5. Suggest Sleep Time\n";
+            cout << "6. Save Report\n";
+            cout << "7. Load Report\n";
+            cout << "0. Exit\n";
+
+            cout << "Choice: ";
+            cin >> ch;
+
+            switch (ch) {
+                case 1:
+                    createProfile();
+                    break;
+
+                case 2:
+                    addSleep();
+                    break;
+
+                case 3:
+                    showLogs();
+                    break;
+
+                case 4:
+                    analyze();
+                    break;
+
+                case 5:
+                    suggestTime();
+                    break;
+
+                case 6: {
+                    double avg = log.averageSleep();
+
+                    double health =
+                        HealthScore::calculate(
+                            avg,
+                            user->getStress(),
+                            user->getWork(),
+                            user->getScreen(),
+                            user->getExercise()
+                        );
+
+                    FileManager::save(avg, health);
+                    break;
+                }
+
+                case 7:
+                    FileManager::load();
+                    break;
+
+                case 0:
+                    cout << "Exiting...\n";
+                    break;
+
+                default:
+                    cout << "Invalid choice!\n";
+            }
+
+        } while (ch != 0);
+    }
+};
+
+int main() {
+    SleepSystem system;
+
+    system.menu();
+
+    return 0;
+}
