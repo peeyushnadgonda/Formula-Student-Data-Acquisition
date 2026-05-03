@@ -1,0 +1,225 @@
+
+#include <SoftwareSerial.h>
+
+int p1 = A0; //APPS pot1 in
+int p2 = A1; //APPS pot2 in
+int bps = A2; //brake pressure in
+int pts = 8; //Push to start button input
+int pot1, pot2; 
+int sRX = 10;
+int sTX = 9;
+int p;
+int a = 319; //POT2 minimum bit value
+int b = 615; //POT2 maximum bit value
+int x = 415; //POT1 minimum bit value
+int y = 922; //POT1 maximum bit value
+int sd;
+int thr_avg = 0;
+
+// min max values used to map pot, values measured via arduino with pots connected
+int ss = 0; //temporary startup sequence step value
+long et = 0; //temporary time storage value for deviation
+long long c = 0; //temporary time storage value for deviation
+bool ts_on;
+
+SoftwareSerial s1 = SoftwareSerial(sRX, sTX);
+
+void setup() {
+  pinMode(pts, INPUT);
+
+  pinMode(2, OUTPUT); //deviation led
+  pinMode(3, OUTPUT); //scs led
+  pinMode(4, OUTPUT); //buzzer out
+  pinMode(5, INPUT); //Motor Controller
+  pinMode(7, OUTPUT); //RTD Out
+  pinMode(6, OUTPUT); //throttle o/p
+  pinMode(sRX, INPUT); //throttle o/p
+  pinMode(sTX, OUTPUT); //throttle o/p
+  pinMode(11, INPUT); //scs error in (HIGH when error)
+
+  Serial.begin(9600);
+  s1.begin(115200);
+
+  digitalWrite(4, LOW); // buzzer off
+  apps_deve(1);
+  apps_scse(1);
+  delay(2000);
+  apps_deve(0);
+  apps_scse(0);
+  
+  Serial.println("Vehicle ON!!!"); // Indicates vehicle is ready for pts
+  ts_on = false;
+  sd = -2;
+}
+
+void motor_throttle(int thr1, int thr2){
+  thr_avg = min(thr1,thr2); // output throttle is avg of both pins
+  if (thr_avg < 13) {thr_avg = 0;} // 13 for dead play of 5%
+  if (thr_avg > 255) {thr_avg = 255;}
+  analogWrite(6, thr_avg); // 6 is throttle out pin
+  Serial.print("\t Thr: ");
+  Serial.print(thr_avg);
+} // Send motor throttle signal on pin 6
+
+void apps_scse(bool a){
+  if (a){
+    digitalWrite(2, HIGH); // scs error led out is on pin 3
+  }
+  else{
+    digitalWrite(2, LOW);
+  }
+}
+
+void apps_deve(bool a){
+  if (a){
+    digitalWrite(3, HIGH); // deviation error led out is on pin 2 
+  }
+  else{
+    digitalWrite(3, LOW);
+  }
+}
+
+int startup(int bp, bool ts_on){
+  // pin 4 == RTDS (buzzer)
+  digitalWrite(7, LOW);
+  if ((bp >= 30) && (ts_on)){ // RTDS on for 2.5secs when bp >= 30 bar // bp --> brake pressure
+    Serial.println("\nVehicle is Ready to Drive!!");
+    delay(100);
+    digitalWrite(4, HIGH); // buzzer pin 4
+    delay(2000);
+    digitalWrite(4, LOW); 
+    return 1; //If the brake pressure is above 30 bar, startup sequence advances to step 1
+  }
+  else{
+    Serial.println("\nStart-up Sequense Reset!!"); 
+    delay(100);
+    return 0; //If the brake pressure is not above 30 bar, startup sequence remains at step 0
+  }//startup sequence is denoted further as ss, where its value denotes the step
+}
+
+void loop() {
+
+  // if (digitalRead(5) == HIGH){
+  //   if (ss == 0){
+  //   ts_on = true;
+  //   }
+  // }
+  if ((ts_on == false) && (ss == 1) && (sd != -2)){
+    goto nneol;
+  }
+
+  if (digitalRead(11) == HIGH){
+    motor_throttle(0,0); // set motor throttle 0 if scs is detected
+    sd = 0;
+    delay(10);
+    ts_on = false;
+    Serial.println("SCS Error!!");
+    delay(100);
+  }
+
+  int dev, thr1, thr2, bp;
+  p = digitalRead(pts);
+  pot1 = analogRead(p1); // read value from pot1
+  pot2 = analogRead(p2); // read value from pot2
+  
+  Serial.print("\t Pot1: ");
+  Serial.print(pot1);
+  Serial.print("\t Pot2: ");
+  Serial.print(pot2);
+
+  int bpv = analogRead(bps); // Read brake pressure sensor analog value
+  bp = map(bpv, 221, 1105, 0, 200); // map analog value to brake pressure
+
+  thr1 = map(pot1, x, y, 0, 255); // x and y are least and most digital values of the pot
+  thr2 = map(pot2, a, b, 0, 255); // a and b are least and most digital values of the pot
+  // Map throttles
+
+  dev = (abs(thr1-thr2) / 255.0)*100; //Calculate Deviation
+
+ if(p == HIGH && ss ==0){
+    ss = startup(bp, 1); // if pts pin pressed, brake pressure is checked and startup sequence is proceed accordingly
+    digitalWrite(7, HIGH);
+    delay(100);
+    p = LOW;
+  }
+  else if(ss == 1){
+    if (dev >=20000.0){
+      if (c==0){
+        c = millis();
+        motor_throttle(thr1,thr2); // c is the timestamp where deviation more than 10 started ocurring
+      }
+      else if(c>0){
+        et = millis - c; // et is elapsed time from c
+        motor_throttle(thr1,thr2);
+      }
+      if (et >= 200){ // Check if deviation is present for more than 100ms, then give throttle 0
+        Serial.println("\t Deviation too High!!");
+        motor_throttle(0,0);
+        apps_deve(1);
+        sd = 1;
+        delay(10);
+        goto nneol;
+      } 
+    }
+    else if((dev < 20000.0) || (c == 0)){
+      motor_throttle(thr1,thr2);
+      apps_deve(0); 
+    }
+  
+  }
+  else{
+    motor_throttle(0,0);
+  }
+  goto eol;
+
+  nneol:
+  motor_throttle(0,0);
+  apps_scse((!sd));
+  apps_deve((sd)); 
+
+  eol:
+  if (ss == 1){
+    // Header byte (keeps same header as before)
+    const uint8_t header = 67;
+    s1.write(header);
+
+    // Pack values as 16-bit unsigned (Arduino int on AVR is 16-bit)
+    uint16_t v_thr = (uint16_t)thr_avg;
+    uint16_t v_bp  = (uint16_t)bp;
+    uint16_t v_dev = (uint16_t)dev;
+    uint16_t v_ss  = (uint16_t)ss;
+    uint16_t v_sd  = (uint16_t)sd;
+
+    // Create a payload of 5 x 2 bytes = 10 bytes (big-endian: MSB then LSB)
+    uint8_t payload[10];
+    payload[0] = (v_thr >> 8) & 0xFF;
+    payload[1] =  v_thr        & 0xFF;
+    payload[2] = (v_bp  >> 8) & 0xFF;
+    payload[3] =  v_bp         & 0xFF;
+    payload[4] = (v_dev >> 8) & 0xFF;
+    payload[5] =  v_dev        & 0xFF;
+    payload[6] = (v_ss  >> 8) & 0xFF;
+    payload[7] =  v_ss         & 0xFF;
+    payload[8] = (v_sd  >> 8) & 0xFF;
+    payload[9] =  v_sd         & 0xFF;
+
+    // Send payload (SoftwareSerial supports write(buffer, size))
+    s1.write(payload, sizeof(payload));
+
+    // Simple checksum: sum of all payload bytes modulo 256
+    uint8_t checksum = 0;
+    for (uint8_t i = 0; i < sizeof(payload); ++i) checksum += payload[i];
+    s1.write(checksum);
+  Serial.print("\t Dev: ");
+  Serial.print(dev);
+  Serial.print("\t Brake Pressure: ");
+  Serial.print(bp);
+  Serial.print("\t Startup Seq: ");
+  Serial.print(ss);
+  Serial.print("\n");
+  Serial.print("\t TS:");
+  Serial.print(ts_on);
+  Serial.print("\t SD:");
+  Serial.print(sd);
+  delay(0);
+}
